@@ -64,3 +64,22 @@ resource "oci_core_security_list" "public_security_list" {
     }
   }
 }
+
+#public subnet
+resource "oci_core_subnet" "public_subnet" {
+  compartment_id = var.compartment_ocid
+
+  vcn_id = oci_core_vcn.main_vcn.id
+
+  cidr_block   = "10.0.1.0/24"
+  display_name = "public-subnet-github"
+  dns_label    = "publicsubnet"
+
+  route_table_id = oci_core_route_table.public_rt.id
+
+  security_list_ids = [
+    oci_core_security_list.public_security_list.id
+  ]
+
+  prohibit_public_ip_on_vnic = false
+}
