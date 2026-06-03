@@ -11,10 +11,12 @@ jobs:
 
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4  # v5 doesn't exist yet
 
       - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v4
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~1.9"  # Ensures skip_s3_checksum is available (requires >=1.6.4)
 
       - name: Create OCI API Key
         run: |
@@ -45,7 +47,9 @@ jobs:
             -backend-config="skip_credentials_validation=true" \
             -backend-config="skip_requesting_account_id=true" \
             -backend-config="skip_metadata_api_check=true" \
-            -backend-config="use_path_style=true" 
+            -backend-config="use_path_style=true" \
+            -backend-config="skip_s3_checksum=true"
+
       - name: Terraform Validate
         run: terraform validate
 
