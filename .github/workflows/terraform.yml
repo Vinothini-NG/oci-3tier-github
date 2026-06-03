@@ -1,0 +1,45 @@
+name: OCI Terraform Pipeline
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v5
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v4
+
+      - name: Create OCI API Key
+        run: |
+          cat <<EOF > oci_api_key.pem
+          ${{ secrets.OCI_API_PRIVATE_KEY }}
+          EOF
+          chmod 600 oci_api_key.pem
+
+      - name: Set Terraform Variables
+        run: |
+          echo "TF_VAR_tenancy_ocid=${{ secrets.OCI_TENANCY_OCID }}" >> $GITHUB_ENV
+          echo "TF_VAR_user_ocid=${{ secrets.OCI_USER_OCID }}" >> $GITHUB_ENV
+          echo "TF_VAR_fingerprint=${{ secrets.OCI_FINGERPRINT }}" >> $GITHUB_ENV
+          echo "TF_VAR_region=${{ secrets.OCI_REGION }}" >> $GITHUB_ENV
+          echo "TF_VAR_compartment_ocid=${{ secrets.OCI_COMPARTMENT_OCID }}" >> $GITHUB_ENV
+          echo "TF_VAR_private_key_path=./oci_api_key.pem" >> $GITHUB_ENV
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Validate
+        run: terraform validate
+
+      - name: Terraform Plan
+        run: terraform plan -out=tfplan
+
+      - name: Terraform Apply
+        run: terraform apply -auto-approve tfplan
