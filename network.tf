@@ -156,3 +156,22 @@ data "oci_core_services" "all_services" {
     regex  = true
   }
 }
+
+#CREATING PRIVATE ROUTE TABLE
+resource "oci_core_route_table" "private_rt" {
+  compartment_id = var.compartment_ocid
+  vcn_id         = oci_core_vcn.main_vcn.id
+  display_name   = "privateRT-tf-github"
+
+  route_rules {
+    destination       = "0.0.0.0/0"
+    destination_type  = "CIDR_BLOCK"
+    network_entity_id = oci_core_nat_gateway.private_nat_gateway.id
+  }
+
+  route_rules {
+    destination       = lookup(data.oci_core_services.all_services.services[0], "cidr_block")
+    destination_type  = "SERVICE_CIDR_BLOCK"
+    network_entity_id = oci_core_service_gateway.service_gateway.id
+  }
+}
