@@ -383,7 +383,7 @@ output "load_balancer_public_ip" {
 
 resource "null_resource" "bastion_to_private_test" {
   triggers = {
-    version = "3"
+    version = "4"
   }
 
   depends_on = [
@@ -398,18 +398,24 @@ resource "null_resource" "bastion_to_private_test" {
     host        = oci_core_instance.bastion_host.public_ip
   }
 
-  # Provisioner 1: sensitive ops — output will be suppressed, that's expected
+  # Provisioner 1: sensitive ops — output suppressed, expected
   provisioner "remote-exec" {
     inline = [
       "mkdir -p ~/.ssh",
       "cat > ~/.ssh/private_key <<'EOF'\n${var.ssh_private_key}\nEOF",
       "chmod 600 ~/.ssh/private_key",
-      # Run SSH and write result + exit code to file
-      "ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'echo CONNECTED && hostname && date' > /tmp/connectivity_result.txt 2>&1; echo $? > /tmp/connectivity_exit_code.txt"
+      # Connectivity test
+      "ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'echo CONNECTED && hostname && date' > /tmp/connectivity_result.txt 2>&1; echo $? > /tmp/connectivity_exit_code.txt",  # <-- comma was missing here
+      # httpd install
+      "ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'sudo yum install -y httpd 2>&1' > /tmp/httpd_install.txt 2>&1; echo $? > /tmp/httpd_install_exit.txt",
+      "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'sudo systemctl enable httpd 2>&1' > /tmp/httpd_enable.txt 2>&1; echo $? > /tmp/httpd_enable_exit.txt",
+      "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'sudo systemctl start httpd 2>&1' > /tmp/httpd_start.txt 2>&1; echo $? > /tmp/httpd_start_exit.txt",
+      "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'sudo firewall-cmd --permanent --add-port=80/tcp 2>&1' > /tmp/httpd_fw1.txt 2>&1; echo $? > /tmp/httpd_fw1_exit.txt",
+      "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'sudo firewall-cmd --reload 2>&1' > /tmp/httpd_fw2.txt 2>&1; echo $? > /tmp/httpd_fw2_exit.txt"
     ]
   }
 
-  # Provisioner 2: no sensitive vars — output will be fully visible in pipeline
+  # Provisioner 2: no sensitive vars — fully visible in pipeline
   provisioner "remote-exec" {
     inline = [
       "echo '========================================='",
@@ -426,8 +432,44 @@ resource "null_resource" "bastion_to_private_test" {
       "echo -n 'SSH Exit Code: '",
       "cat /tmp/connectivity_exit_code.txt",
       "echo ''",
-      # Fail the provisioner (and terraform apply) if SSH actually failed
-      "exit $(cat /tmp/connectivity_exit_code.txt)"
+      # removed "exit $(cat ...)" — it would kill the script before httpd results print
+      "echo '========================================='",
+      "echo '       HTTPD INSTALLATION RESULTS        '",
+      "echo '  Target: ${oci_core_instance.application_node1.private_ip}'",
+      "echo '========================================='",
+
+      "echo ''",
+      "echo '--- [1/5] yum install httpd ---'",
+      "cat /tmp/httpd_install.txt",
+      "echo -n 'Exit code: '; cat /tmp/httpd_install_exit.txt",
+
+      "echo ''",
+      "echo '--- [2/5] systemctl enable httpd ---'",
+      "cat /tmp/httpd_enable.txt",
+      "echo -n 'Exit code: '; cat /tmp/httpd_enable_exit.txt",
+
+      "echo ''",
+      "echo '--- [3/5] systemctl start httpd ---'",
+      "cat /tmp/httpd_start.txt",
+      "echo -n 'Exit code: '; cat /tmp/httpd_start_exit.txt",
+
+      "echo ''",
+      "echo '--- [4/5] firewall-cmd --add-port=80/tcp ---'",
+      "cat /tmp/httpd_fw1.txt",
+      "echo -n 'Exit code: '; cat /tmp/httpd_fw1_exit.txt",
+
+      "echo ''",
+      "echo '--- [5/5] firewall-cmd --reload ---'",
+      "cat /tmp/httpd_fw2.txt",
+      "echo -n 'Exit code: '; cat /tmp/httpd_fw2_exit.txt",
+
+      "echo ''",
+      "echo '========================================='",
+      # Final verification
+      "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'sudo systemctl is-active httpd && echo HTTPD IS RUNNING || echo HTTPD FAILED TO START'",
+      # Fail apply if httpd not running
+      "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'sudo systemctl is-active --quiet httpd'",
+      "echo '========================================='"
     ]
   }
 }
