@@ -383,7 +383,7 @@ output "load_balancer_public_ip" {
 
 resource "null_resource" "bastion_to_private_test" {
   triggers = {
-    version = "8"
+    version = "9"
   }
 
   depends_on = [
@@ -450,10 +450,16 @@ resource "null_resource" "bastion_to_private_test" {
       "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'sudo ldconfig' > /tmp/ldconfig.txt 2>&1; echo $? > /tmp/ldconfig_exit.txt",
 
       # Check admin directory before wallet
-      "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'cd /usr/lib/oracle/19.30/client64/lib/network/admin && ls' > /tmp/admin_dir.txt 2>&1; echo $? > /tmp/admin_dir_exit.txt",
+      "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'ls /usr/lib/oracle/19.30/client64/lib/network/admin' > /tmp/admin_dir.txt 2>&1; echo $? > /tmp/admin_dir_exit.txt",
 
-      # Download wallet
-      "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'curl -L -o /tmp/wallet.zip \"https://objectstorage.ap-sydney-1.oraclecloud.com${oci_objectstorage_preauthrequest.wallet_par.access_uri}\"' > /tmp/wallet_download.txt 2>&1; echo $? > /tmp/wallet_download_exit.txt",
+      # Download wallet — using var.region to avoid hardcoded region
+      "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'curl -f -L --show-error -o /tmp/wallet.zip \"https://objectstorage.${var.region}.oraclecloud.com${oci_objectstorage_preauthrequest.wallet_par.access_uri}\"' > /tmp/wallet_download.txt 2>&1; echo $? > /tmp/wallet_download_exit.txt",
+
+      # Verify downloaded file is actually a zip
+      "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'file /tmp/wallet.zip' > /tmp/wallet_filetype.txt 2>&1; echo $? > /tmp/wallet_filetype_exit.txt",
+
+      # Check file size
+      "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'ls -lh /tmp/wallet.zip' > /tmp/wallet_size.txt 2>&1; echo $? > /tmp/wallet_size_exit.txt",
 
       # Move wallet
       "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'sudo mv /tmp/wallet.zip /usr/lib/oracle/19.30/client64/lib/network/admin/' > /tmp/wallet_move.txt 2>&1; echo $? > /tmp/wallet_move_exit.txt",
@@ -464,8 +470,11 @@ resource "null_resource" "bastion_to_private_test" {
       # Fix permissions
       "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'sudo chmod 644 /usr/lib/oracle/19.30/client64/lib/network/admin/*' > /tmp/wallet_chmod.txt 2>&1; echo $? > /tmp/wallet_chmod_exit.txt",
 
-      # Verify wallet files
-      "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'ls /usr/lib/oracle/19.30/client64/lib/network/admin' > /tmp/wallet_verify.txt 2>&1; echo $? > /tmp/wallet_verify_exit.txt",
+      # Verify wallet files — tnsnames.ora must be present
+      "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'ls -la /usr/lib/oracle/19.30/client64/lib/network/admin/' > /tmp/wallet_verify.txt 2>&1; echo $? > /tmp/wallet_verify_exit.txt",
+
+      # Confirm tnsnames.ora exists
+      "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'cat /usr/lib/oracle/19.30/client64/lib/network/admin/tnsnames.ora' > /tmp/tnsnames.txt 2>&1; echo $? > /tmp/tnsnames_exit.txt",
 
       # Test sqlplus DB connection
       "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'export TNS_ADMIN=/usr/lib/oracle/19.30/client64/lib/network/admin && echo \"SELECT PROD_NAME, PROD_DESC FROM SH.PRODUCTS ORDER BY PROD_NAME;\\nEXIT;\" | /usr/lib/oracle/19.30/client64/bin/sqlplus -s ADMIN/Oracle123456@MYAUTONOMOUSDBTF_high' > /tmp/sqlplus_test.txt 2>&1; echo $? > /tmp/sqlplus_test_exit.txt",
@@ -619,29 +628,44 @@ resource "null_resource" "bastion_to_private_test" {
       "echo '========================================='",
       "echo '       WALLET DEPLOYMENT RESULTS         '",
       "echo '========================================='",
-      "echo '--- [1/5] curl download wallet ---'",
+      "echo '--- [1/7] curl download wallet ---'",
       "cat /tmp/wallet_download.txt",
       "echo -n 'Exit code: '; cat /tmp/wallet_download_exit.txt",
 
       "echo ''",
-      "echo '--- [2/5] mv wallet.zip to admin dir ---'",
+      "echo '--- [2/7] wallet file type check ---'",
+      "cat /tmp/wallet_filetype.txt",
+      "echo -n 'Exit code: '; cat /tmp/wallet_filetype_exit.txt",
+
+      "echo ''",
+      "echo '--- [3/7] wallet file size ---'",
+      "cat /tmp/wallet_size.txt",
+      "echo -n 'Exit code: '; cat /tmp/wallet_size_exit.txt",
+
+      "echo ''",
+      "echo '--- [4/7] mv wallet.zip to admin dir ---'",
       "cat /tmp/wallet_move.txt",
       "echo -n 'Exit code: '; cat /tmp/wallet_move_exit.txt",
 
       "echo ''",
-      "echo '--- [3/5] unzip wallet ---'",
+      "echo '--- [5/7] unzip wallet ---'",
       "cat /tmp/wallet_unzip.txt",
       "echo -n 'Exit code: '; cat /tmp/wallet_unzip_exit.txt",
 
       "echo ''",
-      "echo '--- [4/5] chmod 644 wallet files ---'",
+      "echo '--- [6/7] chmod 644 wallet files ---'",
       "cat /tmp/wallet_chmod.txt",
       "echo -n 'Exit code: '; cat /tmp/wallet_chmod_exit.txt",
 
       "echo ''",
-      "echo '--- [5/5] verify wallet files ---'",
+      "echo '--- [7/7] verify wallet files ---'",
       "cat /tmp/wallet_verify.txt",
       "echo -n 'Exit code: '; cat /tmp/wallet_verify_exit.txt",
+
+      "echo ''",
+      "echo '--- tnsnames.ora contents ---'",
+      "cat /tmp/tnsnames.txt",
+      "echo -n 'Exit code: '; cat /tmp/tnsnames_exit.txt",
 
       "echo ''",
       "echo '========================================='",
@@ -687,13 +711,15 @@ resource "null_resource" "bastion_to_private_test" {
       "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'getenforce'",
       # Confirm index.sh exists and is executable
       "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'ls -la /var/www/html/index.sh'",
-      # Confirm wallet files present
+      # Confirm wallet files present including tnsnames.ora
       "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'ls -la /usr/lib/oracle/19.30/client64/lib/network/admin/'",
       # Confirm Oracle packages installed
       "echo '--- Installed Oracle Instant Client packages ---'",
       "cat /tmp/oci_verify.txt",
       # Confirm LD_LIBRARY_PATH set
       "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'grep LD_LIBRARY_PATH /etc/bashrc'",
+      # Confirm conf changes are present
+      "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'grep -E \"AddHandler|ExecCGI|DirectoryIndex\" /etc/httpd/conf/httpd.conf'",
       # Fail apply if httpd not running
       "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'sudo systemctl is-active --quiet httpd'",
       "echo '========================================='"
