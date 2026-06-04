@@ -215,3 +215,19 @@ resource "oci_core_security_list" "private_security_list" {
     }
   }
 }
+
+#CREATE PRIVATE SUBNET
+resource "oci_core_subnet" "private_subnet" {
+  compartment_id             = var.compartment_ocid
+  vcn_id                     = oci_core_vcn.main_vcn.id
+  cidr_block                 = "10.0.2.0/24"
+  display_name               = "private-subnet-tf-github"
+  dns_label                  = "privatesubnet"
+  prohibit_public_ip_on_vnic = true
+
+  route_table_id = oci_core_route_table.private_rt.id
+
+  security_list_ids = [
+    oci_core_security_list.private_security_list.id
+  ]
+}
