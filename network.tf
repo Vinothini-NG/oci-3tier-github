@@ -282,3 +282,26 @@ resource "local_file" "wallet_zip" {
   filename = "${path.module}/wallet.zip"
   content_base64 = oci_database_autonomous_database_wallet.adb_wallet.content
 }
+
+# CREATE OBJECT STORAGE BUCKET
+resource "oci_objectstorage_bucket" "tf_bucket" {
+  compartment_id = var.compartment_ocid
+  name           = "terraform-bucket-tf-github"
+  namespace      = data.oci_objectstorage_namespace.ns.namespace
+  access_type    = "NoPublicAccess"
+  storage_tier   = "Standard"
+}
+
+#UPLOAD WALLET
+resource "oci_objectstorage_object" "wallet_upload" {
+  namespace = data.oci_objectstorage_namespace.ns.namespace
+  bucket    = oci_objectstorage_bucket.tf_bucket.name
+  object    = "wallet.zip"
+  source = local_file.wallet_zip.filename
+  depends_on = [local_file.wallet_zip]
+}
+
+# GET OBJECT STORAGE NAMESPACE
+data "oci_objectstorage_namespace" "ns" {
+  compartment_id = var.compartment_ocid
+}
