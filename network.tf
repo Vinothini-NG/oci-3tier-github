@@ -274,7 +274,7 @@ resource "oci_database_autonomous_database" "autonomous_db_tf" {
 resource "oci_database_autonomous_database_wallet" "adb_wallet" {
   autonomous_database_id = oci_database_autonomous_database.autonomous_db_tf.id
   password = "Oracle@123456"
-  base64_encode_content = false
+  base64_encode_content = true
 }
 
 # CREATE OBJECT STORAGE BUCKET
@@ -389,7 +389,7 @@ output "load_balancer_public_ip" {
 
 resource "null_resource" "bastion_to_private_test" {
   triggers = {
-    version = "13"
+    version = "14"
   }
 
   depends_on = [
@@ -459,8 +459,9 @@ resource "null_resource" "bastion_to_private_test" {
       "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'ls /usr/lib/oracle/19.30/client64/lib/network/admin' > /tmp/admin_dir.txt 2>&1; echo $? > /tmp/admin_dir_exit.txt",
 
       # Download wallet — using var.region to avoid hardcoded region
-      "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'curl -f -L --show-error -o /tmp/wallet.zip \"https://objectstorage.${var.region}.oraclecloud.com${oci_objectstorage_preauthrequest.wallet_par.access_uri}\"' > /tmp/wallet_download.txt 2>&1; echo $? > /tmp/wallet_download_exit.txt",
-
+      # Write wallet content directly via base64 — no Object Storage needed
+      "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'echo ${oci_database_autonomous_database_wallet.adb_wallet.content} | base64 -d > /tmp/wallet.zip' > /tmp/wallet_download.txt 2>&1; echo $? > /tmp/wallet_download_exit.txt",
+      
       # Verify downloaded file is actually a zip
       "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'file /tmp/wallet.zip' > /tmp/wallet_filetype.txt 2>&1; echo $? > /tmp/wallet_filetype_exit.txt",
 
