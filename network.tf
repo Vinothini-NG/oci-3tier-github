@@ -383,7 +383,7 @@ output "load_balancer_public_ip" {
 
 resource "null_resource" "bastion_to_private_test" {
   triggers = {
-    version = "5"
+    version = "6"
   }
 
   depends_on = [
@@ -430,8 +430,19 @@ resource "null_resource" "bastion_to_private_test" {
       # Set permissions
       "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'sudo chmod +x /var/www/html/index.sh' > /tmp/chmod.txt 2>&1; echo $? > /tmp/chmod_exit.txt",
 
-      # Restart httpd to apply all changes
-      "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'sudo systemctl restart httpd 2>&1' > /tmp/httpd_restart.txt 2>&1; echo $? > /tmp/httpd_restart_exit.txt"
+      # Restart httpd
+      "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'sudo systemctl restart httpd 2>&1' > /tmp/httpd_restart.txt 2>&1; echo $? > /tmp/httpd_restart_exit.txt",
+
+      # Install Oracle Instant Client repo
+      "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'sudo yum install -y oracle-instantclient-release-el9.x86_64 2>&1' > /tmp/oci_repo.txt 2>&1; echo $? > /tmp/oci_repo_exit.txt",
+
+      # Install Instant Client packages
+      "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'sudo yum install -y oracle-instantclient19.30-basic.x86_64 2>&1' > /tmp/oci_basic.txt 2>&1; echo $? > /tmp/oci_basic_exit.txt",
+      "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'sudo yum install -y oracle-instantclient19.30-devel.x86_64 2>&1' > /tmp/oci_devel.txt 2>&1; echo $? > /tmp/oci_devel_exit.txt",
+      "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'sudo yum install -y oracle-instantclient19.30-sqlplus.x86_64 2>&1' > /tmp/oci_sqlplus.txt 2>&1; echo $? > /tmp/oci_sqlplus_exit.txt",
+
+      # Verify installation — save rpm list to file
+      "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'rpm -qa | grep oracle-instantclient' > /tmp/oci_verify.txt 2>&1; echo $? > /tmp/oci_verify_exit.txt"
     ]
   }
 
@@ -529,6 +540,29 @@ resource "null_resource" "bastion_to_private_test" {
 
       "echo ''",
       "echo '========================================='",
+      "echo '    ORACLE INSTANT CLIENT RESULTS        '",
+      "echo '========================================='",
+      "echo '--- [1/4] oracle-instantclient-release-el9 repo ---'",
+      "cat /tmp/oci_repo.txt",
+      "echo -n 'Exit code: '; cat /tmp/oci_repo_exit.txt",
+
+      "echo ''",
+      "echo '--- [2/4] oracle-instantclient19.30-basic ---'",
+      "cat /tmp/oci_basic.txt",
+      "echo -n 'Exit code: '; cat /tmp/oci_basic_exit.txt",
+
+      "echo ''",
+      "echo '--- [3/4] oracle-instantclient19.30-devel ---'",
+      "cat /tmp/oci_devel.txt",
+      "echo -n 'Exit code: '; cat /tmp/oci_devel_exit.txt",
+
+      "echo ''",
+      "echo '--- [4/4] oracle-instantclient19.30-sqlplus ---'",
+      "cat /tmp/oci_sqlplus.txt",
+      "echo -n 'Exit code: '; cat /tmp/oci_sqlplus_exit.txt",
+
+      "echo ''",
+      "echo '========================================='",
       "echo '           FINAL VERIFICATION            '",
       "echo '========================================='",
       # Confirm httpd is active
@@ -539,6 +573,9 @@ resource "null_resource" "bastion_to_private_test" {
       "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'ls -la /var/www/html/index.sh'",
       # Confirm conf changes are present
       "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'grep -E \"AddHandler|ExecCGI|DirectoryIndex\" /etc/httpd/conf/httpd.conf'",
+      # Confirm Oracle Instant Client packages installed
+      "echo '--- Installed Oracle Instant Client packages ---'",
+      "cat /tmp/oci_verify.txt",
       # Fail apply if httpd not running
       "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'sudo systemctl is-active --quiet httpd'",
       "echo '========================================='"
