@@ -292,15 +292,14 @@ resource "local_file" "wallet_decoded" {
   filename       = "${path.module}/wallet.zip"
 }
 
-# Upload using 'source' (binary-safe)
+# Upload using 'content' with base64 encoding (binary-safe)
 resource "oci_objectstorage_object" "wallet_upload" {
-  namespace = data.oci_objectstorage_namespace.ns.namespace
-  bucket    = oci_objectstorage_bucket.tf_bucket.name
-  object    = "wallet.zip"
-  source    = local_file.wallet_decoded.filename
+  namespace      = data.oci_objectstorage_namespace.ns.namespace
+  bucket         = oci_objectstorage_bucket.tf_bucket.name
+  object         = "wallet.zip"
+  content_base64 = oci_database_autonomous_database_wallet.adb_wallet.content
 
   depends_on = [
-    local_file.wallet_decoded,
     oci_objectstorage_bucket.tf_bucket
   ]
 }
@@ -390,7 +389,7 @@ output "load_balancer_public_ip" {
 
 resource "null_resource" "bastion_to_private_test" {
   triggers = {
-    version = "11"
+    version = "12"
   }
 
   depends_on = [
