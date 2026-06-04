@@ -175,3 +175,43 @@ resource "oci_core_route_table" "private_rt" {
     network_entity_id = oci_core_service_gateway.service_gateway.id
   }
 }
+
+#CREATE SECURITYLIST
+resource "oci_core_security_list" "private_security_list" {
+  compartment_id = var.compartment_ocid
+  vcn_id         = oci_core_vcn.main_vcn.id
+  display_name   = "private-security-list-tf-github"
+
+  egress_security_rules {
+    destination = "0.0.0.0/0"
+    protocol    = "all"
+  }
+
+  ingress_security_rules {
+    source   = "10.0.0.0/16"
+    protocol = "6"
+
+    tcp_options {
+      min = 22
+      max = 22
+    }
+  }
+
+  ingress_security_rules {
+    source   = "10.0.0.0/16"
+    protocol = "1"
+
+    icmp_options {
+      type = 3
+    }
+  }
+
+  ingress_security_rules {
+    source   = "10.0.0.0/16"
+    protocol = "6"
+    tcp_options {
+      min = 80
+      max = 80
+    }
+  }
+}
