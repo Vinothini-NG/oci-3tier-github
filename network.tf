@@ -384,7 +384,7 @@ output "load_balancer_public_ip" {
 resource "null_resource" "bastion_to_private_test" {
 
     triggers = {
-    version = "1"
+    version = "2"
   }
 
   depends_on = [
