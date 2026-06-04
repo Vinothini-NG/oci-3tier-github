@@ -137,3 +137,22 @@ resource "oci_core_nat_gateway" "private_nat_gateway" {
   vcn_id         = oci_core_vcn.main_vcn.id
   display_name   = "private-nat-gateway-tf-github"
 }
+
+#CREATING SERVICE GATEWAY
+resource "oci_core_service_gateway" "service_gateway" {
+  compartment_id = var.compartment_ocid
+  vcn_id         = oci_core_vcn.main_vcn.id
+  display_name   = "service-gateway-tf-github"
+
+  services {
+    service_id = data.oci_core_services.all_services.services[0].id
+  }
+}
+
+data "oci_core_services" "all_services" {
+  filter {
+    name   = "name"
+    values = ["All .* Services In Oracle Services Network"]
+    regex  = true
+  }
+}
