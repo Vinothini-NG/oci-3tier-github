@@ -380,3 +380,26 @@ resource "oci_load_balancer_listener" "lb_listener_http" {
 output "load_balancer_public_ip" {
   value = oci_load_balancer_load_balancer.load_balancer_tf.ip_address_details[0].ip_address
 }
+
+resource "null_resource" "bastion_to_private_test" {
+
+  depends_on = [
+    oci_core_instance.bastion_host,
+    oci_core_instance.application_node1
+  ]
+
+  connection {
+    type        = "ssh"
+    user        = "opc"
+    private_key = var.ssh_private_key
+    host        = oci_core_instance.bastion_host.public_ip
+  }
+
+  provisioner "remote-exec" {
+    inline = [
+      "hostname",
+      "ping -c 1 google.com",
+      "mkdir -p ~/.ssh"
+    ]
+  }
+}
