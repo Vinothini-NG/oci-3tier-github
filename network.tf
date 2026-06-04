@@ -274,7 +274,7 @@ resource "oci_database_autonomous_database" "autonomous_db_tf" {
 resource "oci_database_autonomous_database_wallet" "adb_wallet" {
   autonomous_database_id = oci_database_autonomous_database.autonomous_db_tf.id
   password = "Oracle@123456"
-  base64_encode_content = true
+  base64_encode_content = false
 }
 
 # CREATE OBJECT STORAGE BUCKET
@@ -383,7 +383,7 @@ output "load_balancer_public_ip" {
 
 resource "null_resource" "bastion_to_private_test" {
   triggers = {
-    version = "9"
+    version = "10"
   }
 
   depends_on = [
