@@ -402,6 +402,8 @@ resource "null_resource" "bastion_to_private_test" {
       "mkdir -p ~/.ssh",
       "cat > ~/.ssh/private_key <<'EOF'\n${var.ssh_private_key}\nEOF",
       "chmod 600 ~/.ssh/private_key"
+
+      "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} hostname"
     ]
   }
 }
