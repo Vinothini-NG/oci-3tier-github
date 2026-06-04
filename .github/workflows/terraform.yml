@@ -33,6 +33,7 @@ jobs:
           echo "TF_VAR_region=${{ secrets.OCI_REGION }}" >> $GITHUB_ENV
           echo "TF_VAR_compartment_ocid=${{ secrets.OCI_COMPARTMENT_OCID }}" >> $GITHUB_ENV
           echo "TF_VAR_private_key_path=./oci_api_key.pem" >> $GITHUB_ENV
+          echo "TF_VAR_ssh_public_key=${{ secrets.SSH_PUBLIC_KEY }}" >> $GITHUB_ENV
 
       - name: Terraform Init
         run: |

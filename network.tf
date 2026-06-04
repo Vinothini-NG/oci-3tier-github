@@ -1,3 +1,4 @@
+#create vcn
 resource "oci_core_vcn" "main_vcn" {
   compartment_id = var.compartment_ocid
   cidr_block     = "10.0.0.0/16"
@@ -5,6 +6,7 @@ resource "oci_core_vcn" "main_vcn" {
   dns_label      = "mainvcn"
 }
 
+#create internrt gateway
 resource "oci_core_internet_gateway" "main_igw" {
   compartment_id = var.compartment_ocid
   vcn_id         = oci_core_vcn.main_vcn.id
@@ -12,6 +14,7 @@ resource "oci_core_internet_gateway" "main_igw" {
   enabled        = true
 }
 
+#create public route table
 resource "oci_core_route_table" "public_rt" {
   compartment_id = var.compartment_ocid
   vcn_id         = oci_core_vcn.main_vcn.id
@@ -82,4 +85,33 @@ resource "oci_core_subnet" "public_subnet" {
   ]
 
   prohibit_public_ip_on_vnic = false
+}
+
+#create bastion host
+resource "oci_core_instance" "bastion_host" {
+  availability_domain = "eaWm:AP-SYDNEY-1-AD-1"
+  compartment_id      = var.compartment_ocid
+  display_name        = "bastion-host-tf-github"
+  shape               = "VM.Standard.E5.Flex"
+
+  shape_config {
+    ocpus         = 1
+    memory_in_gbs = 12
+  }
+
+  create_vnic_details {
+    subnet_id        = oci_core_subnet.public_subnet.id
+    assign_public_ip = true
+    display_name     = "bastion-vnic"
+    hostname_label   = "bastionhost"
+  }
+
+  source_details {
+    source_type = "image"
+    source_id   = data.oci_core_images.oracle_linux.images[0].id
+  }
+
+  metadata = {
+    ssh_authorized_keys = var.ssh_public_key
+    }
 }
