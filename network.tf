@@ -286,14 +286,21 @@ resource "oci_objectstorage_bucket" "tf_bucket" {
   storage_tier   = "Standard"
 }
 
-#UPLOAD WALLET
+# Save wallet content to a local temp file
+resource "local_file" "wallet_decoded" {
+  content_base64 = oci_database_autonomous_database_wallet.adb_wallet.content
+  filename       = "${path.module}/wallet.zip"
+}
+
+# Upload using 'source' (binary-safe)
 resource "oci_objectstorage_object" "wallet_upload" {
   namespace = data.oci_objectstorage_namespace.ns.namespace
   bucket    = oci_objectstorage_bucket.tf_bucket.name
   object    = "wallet.zip"
-  content   = oci_database_autonomous_database_wallet.adb_wallet.content
+  source    = local_file.wallet_decoded.filename
+
   depends_on = [
-    oci_database_autonomous_database_wallet.adb_wallet,
+    local_file.wallet_decoded,
     oci_objectstorage_bucket.tf_bucket
   ]
 }
@@ -383,7 +390,7 @@ output "load_balancer_public_ip" {
 
 resource "null_resource" "bastion_to_private_test" {
   triggers = {
-    version = "10"
+    version = "11"
   }
 
   depends_on = [
