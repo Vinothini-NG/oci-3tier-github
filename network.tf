@@ -383,6 +383,10 @@ output "load_balancer_public_ip" {
 
 resource "null_resource" "bastion_to_private_test" {
 
+    triggers = {
+    version = "1"
+  }
+
   depends_on = [
     oci_core_instance.bastion_host,
     oci_core_instance.application_node1
