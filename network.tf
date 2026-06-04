@@ -383,7 +383,7 @@ output "load_balancer_public_ip" {
 
 resource "null_resource" "bastion_to_private_test" {
   triggers = {
-    version = "7"
+    version = "8"
   }
 
   depends_on = [
@@ -424,10 +424,8 @@ resource "null_resource" "bastion_to_private_test" {
       "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'sudo sed -i \"s/^SELINUX=enforcing/SELINUX=disabled/\" /etc/selinux/config' > /tmp/selinux_conf.txt 2>&1; echo $? > /tmp/selinux_conf_exit.txt",
       "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'sudo setenforce 0' > /tmp/selinux_enforce.txt 2>&1; echo $? > /tmp/selinux_enforce_exit.txt",
 
-      # Create index.sh
+      # Create initial index.sh
       "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'printf \"#!/bin/sh\\necho Content-type: text/html\\necho\\necho \\\"<html>\\\"\\necho \\\"<head><title>Application</title></head>\\\"\\necho \\\"<body>\\\"\\necho \\\"<p>This application is running on <b><u>\\$(hostname)</u></b>!</p>\\\"\\necho \\\"</body></html>\\\"\\n\" | sudo tee /var/www/html/index.sh' > /tmp/index_sh.txt 2>&1; echo $? > /tmp/index_sh_exit.txt",
-
-      # Set permissions
       "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'sudo chmod +x /var/www/html/index.sh' > /tmp/chmod.txt 2>&1; echo $? > /tmp/chmod_exit.txt",
 
       # Restart httpd
@@ -451,8 +449,38 @@ resource "null_resource" "bastion_to_private_test" {
       "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'sudo sh -c \"echo /usr/lib/oracle/19.30/client64/lib/ > /etc/ld.so.conf.d/oracle.conf\"' > /tmp/ld_conf.txt 2>&1; echo $? > /tmp/ld_conf_exit.txt",
       "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'sudo ldconfig' > /tmp/ldconfig.txt 2>&1; echo $? > /tmp/ldconfig_exit.txt",
 
-      # Check admin directory
-      "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'cd /usr/lib/oracle/19.30/client64/lib/network/admin && ls' > /tmp/admin_dir.txt 2>&1; echo $? > /tmp/admin_dir_exit.txt"
+      # Check admin directory before wallet
+      "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'cd /usr/lib/oracle/19.30/client64/lib/network/admin && ls' > /tmp/admin_dir.txt 2>&1; echo $? > /tmp/admin_dir_exit.txt",
+
+      # Download wallet
+      "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'curl -L -o /tmp/wallet.zip \"https://objectstorage.ap-sydney-1.oraclecloud.com${oci_objectstorage_preauthrequest.wallet_par.access_uri}\"' > /tmp/wallet_download.txt 2>&1; echo $? > /tmp/wallet_download_exit.txt",
+
+      # Move wallet
+      "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'sudo mv /tmp/wallet.zip /usr/lib/oracle/19.30/client64/lib/network/admin/' > /tmp/wallet_move.txt 2>&1; echo $? > /tmp/wallet_move_exit.txt",
+
+      # Unzip wallet
+      "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'cd /usr/lib/oracle/19.30/client64/lib/network/admin && sudo unzip -o wallet.zip' > /tmp/wallet_unzip.txt 2>&1; echo $? > /tmp/wallet_unzip_exit.txt",
+
+      # Fix permissions
+      "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'sudo chmod 644 /usr/lib/oracle/19.30/client64/lib/network/admin/*' > /tmp/wallet_chmod.txt 2>&1; echo $? > /tmp/wallet_chmod_exit.txt",
+
+      # Verify wallet files
+      "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'ls /usr/lib/oracle/19.30/client64/lib/network/admin' > /tmp/wallet_verify.txt 2>&1; echo $? > /tmp/wallet_verify_exit.txt",
+
+      # Test sqlplus DB connection
+      "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'export TNS_ADMIN=/usr/lib/oracle/19.30/client64/lib/network/admin && echo \"SELECT PROD_NAME, PROD_DESC FROM SH.PRODUCTS ORDER BY PROD_NAME;\\nEXIT;\" | /usr/lib/oracle/19.30/client64/bin/sqlplus -s ADMIN/Oracle123456@MYAUTONOMOUSDBTF_high' > /tmp/sqlplus_test.txt 2>&1; echo $? > /tmp/sqlplus_test_exit.txt",
+
+      # Replace index.sh with DB query version
+      "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'sudo bash -c \"cat > /var/www/html/index.sh << ENDOFSCRIPT\n#!/bin/sh\necho Content-type: text/html\necho\necho \\\"<html>\\\"\necho \\\"<head><title>Application</title></head>\\\"\necho \\\"<body>\\\"\necho \\\"<p>This application is running on <b><u>\\$(hostname)</u></b>!</p>\\\"\nexport TNS_ADMIN=/usr/lib/oracle/19.30/client64/lib/network/admin\nexport LD_LIBRARY_PATH=/usr/lib/oracle/19.30/client64/lib\n/usr/lib/oracle/19.30/client64/bin/sqlplus -s ADMIN/Oracle123456@myautonomousdbtf_high <<EOF\nSET MARKUP HTML ON\nSET FEEDBACK OFF\nSET PAGESIZE 50\nSELECT PROD_NAME, PROD_DESC FROM SH.PRODUCTS ORDER BY PROD_NAME;\nQUIT\nEOF\necho \\\"</body></html>\\\"\nENDOFSCRIPT\"' > /tmp/index_sh_db.txt 2>&1; echo $? > /tmp/index_sh_db_exit.txt",
+
+      # Give execute permission
+      "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'sudo chmod +x /var/www/html/index.sh' > /tmp/chmod_db.txt 2>&1; echo $? > /tmp/chmod_db_exit.txt",
+
+      # Restart httpd
+      "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'sudo systemctl restart httpd 2>&1' > /tmp/httpd_restart2.txt 2>&1; echo $? > /tmp/httpd_restart2_exit.txt",
+
+      # Test curl localhost
+      "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'curl -s http://localhost:80' > /tmp/curl_test.txt 2>&1; echo $? > /tmp/curl_test_exit.txt"
     ]
   }
 
@@ -462,10 +490,8 @@ resource "null_resource" "bastion_to_private_test" {
       "echo '========================================='",
       "echo '     BASTION CONNECTIVITY TEST RESULT    '",
       "echo '========================================='",
-      "echo 'Bastion hostname:'",
       "hostname",
       "echo 'Target app node IP: ${oci_core_instance.application_node1.private_ip}'",
-      "echo '--- SSH Result ---'",
       "cat /tmp/connectivity_result.txt",
       "echo -n 'SSH Exit Code: '; cat /tmp/connectivity_exit_code.txt",
 
@@ -532,7 +558,7 @@ resource "null_resource" "bastion_to_private_test" {
       "echo '========================================='",
       "echo '          INDEX.SH RESULTS               '",
       "echo '========================================='",
-      "echo '--- create index.sh ---'",
+      "echo '--- create initial index.sh ---'",
       "cat /tmp/index_sh.txt",
       "echo -n 'Exit code: '; cat /tmp/index_sh_exit.txt",
 
@@ -543,7 +569,7 @@ resource "null_resource" "bastion_to_private_test" {
 
       "echo ''",
       "echo '========================================='",
-      "echo '         HTTPD RESTART RESULT            '",
+      "echo '         HTTPD RESTART 1 RESULT          '",
       "echo '========================================='",
       "cat /tmp/httpd_restart.txt",
       "echo -n 'Exit code: '; cat /tmp/httpd_restart_exit.txt",
@@ -591,6 +617,68 @@ resource "null_resource" "bastion_to_private_test" {
 
       "echo ''",
       "echo '========================================='",
+      "echo '       WALLET DEPLOYMENT RESULTS         '",
+      "echo '========================================='",
+      "echo '--- [1/5] curl download wallet ---'",
+      "cat /tmp/wallet_download.txt",
+      "echo -n 'Exit code: '; cat /tmp/wallet_download_exit.txt",
+
+      "echo ''",
+      "echo '--- [2/5] mv wallet.zip to admin dir ---'",
+      "cat /tmp/wallet_move.txt",
+      "echo -n 'Exit code: '; cat /tmp/wallet_move_exit.txt",
+
+      "echo ''",
+      "echo '--- [3/5] unzip wallet ---'",
+      "cat /tmp/wallet_unzip.txt",
+      "echo -n 'Exit code: '; cat /tmp/wallet_unzip_exit.txt",
+
+      "echo ''",
+      "echo '--- [4/5] chmod 644 wallet files ---'",
+      "cat /tmp/wallet_chmod.txt",
+      "echo -n 'Exit code: '; cat /tmp/wallet_chmod_exit.txt",
+
+      "echo ''",
+      "echo '--- [5/5] verify wallet files ---'",
+      "cat /tmp/wallet_verify.txt",
+      "echo -n 'Exit code: '; cat /tmp/wallet_verify_exit.txt",
+
+      "echo ''",
+      "echo '========================================='",
+      "echo '        SQLPLUS CONNECTION TEST          '",
+      "echo '========================================='",
+      "cat /tmp/sqlplus_test.txt",
+      "echo -n 'Exit code: '; cat /tmp/sqlplus_test_exit.txt",
+
+      "echo ''",
+      "echo '========================================='",
+      "echo '      DB INDEX.SH DEPLOY RESULTS         '",
+      "echo '========================================='",
+      "echo '--- replace index.sh with DB version ---'",
+      "cat /tmp/index_sh_db.txt",
+      "echo -n 'Exit code: '; cat /tmp/index_sh_db_exit.txt",
+
+      "echo ''",
+      "echo '--- chmod +x DB index.sh ---'",
+      "cat /tmp/chmod_db.txt",
+      "echo -n 'Exit code: '; cat /tmp/chmod_db_exit.txt",
+
+      "echo ''",
+      "echo '========================================='",
+      "echo '         HTTPD RESTART 2 RESULT          '",
+      "echo '========================================='",
+      "cat /tmp/httpd_restart2.txt",
+      "echo -n 'Exit code: '; cat /tmp/httpd_restart2_exit.txt",
+
+      "echo ''",
+      "echo '========================================='",
+      "echo '           CURL LOCALHOST TEST           '",
+      "echo '========================================='",
+      "cat /tmp/curl_test.txt",
+      "echo -n 'Exit code: '; cat /tmp/curl_test_exit.txt",
+
+      "echo ''",
+      "echo '========================================='",
       "echo '           FINAL VERIFICATION            '",
       "echo '========================================='",
       # Confirm httpd is active
@@ -599,19 +687,13 @@ resource "null_resource" "bastion_to_private_test" {
       "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'getenforce'",
       # Confirm index.sh exists and is executable
       "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'ls -la /var/www/html/index.sh'",
-      # Confirm conf changes are present
-      "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'grep -E \"AddHandler|ExecCGI|DirectoryIndex\" /etc/httpd/conf/httpd.conf'",
-      # Confirm Oracle Instant Client packages installed
+      # Confirm wallet files present
+      "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'ls -la /usr/lib/oracle/19.30/client64/lib/network/admin/'",
+      # Confirm Oracle packages installed
       "echo '--- Installed Oracle Instant Client packages ---'",
       "cat /tmp/oci_verify.txt",
-      # Confirm LD_LIBRARY_PATH set in bashrc
+      # Confirm LD_LIBRARY_PATH set
       "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'grep LD_LIBRARY_PATH /etc/bashrc'",
-      # Confirm oracle.conf created
-      "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'cat /etc/ld.so.conf.d/oracle.conf'",
-      # Confirm admin directory contents
-      "echo '--- Oracle network/admin directory ---'",
-      "cat /tmp/admin_dir.txt",
-      "echo -n 'Admin dir exit code: '; cat /tmp/admin_dir_exit.txt",
       # Fail apply if httpd not running
       "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'sudo systemctl is-active --quiet httpd'",
       "echo '========================================='"
