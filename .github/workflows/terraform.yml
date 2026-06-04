@@ -25,16 +25,24 @@ jobs:
           EOF
           chmod 600 oci_api_key.pem
 
+      - name: Create SSH Private Key
+        run: |
+          cat <<EOF > id_rsa
+          ${{ secrets.SSH_PRIVATE_KEY }}
+          EOF
+          chmod 600 id_rsa
+
       - name: Set Terraform Variables
         run: |
-          echo "TF_VAR_tenancy_ocid=${{ secrets.OCI_TENANCY_OCID }}" >> $GITHUB_ENV
-          echo "TF_VAR_user_ocid=${{ secrets.OCI_USER_OCID }}" >> $GITHUB_ENV
-          echo "TF_VAR_fingerprint=${{ secrets.OCI_FINGERPRINT }}" >> $GITHUB_ENV
-          echo "TF_VAR_region=${{ secrets.OCI_REGION }}" >> $GITHUB_ENV
-          echo "TF_VAR_compartment_ocid=${{ secrets.OCI_COMPARTMENT_OCID }}" >> $GITHUB_ENV
-          echo "TF_VAR_private_key_path=./oci_api_key.pem" >> $GITHUB_ENV
-          echo "TF_VAR_ssh_public_key=${{ secrets.SSH_PUBLIC_KEY }}" >> $GITHUB_ENV
-          echo "TF_VAR_ssh_private_key=${{ secrets.SSH_PRIVATE_KEY }}" >> $GITHUB_ENV
+          {
+            echo "TF_VAR_tenancy_ocid=${{ secrets.OCI_TENANCY_OCID }}"
+            echo "TF_VAR_user_ocid=${{ secrets.OCI_USER_OCID }}"
+            echo "TF_VAR_fingerprint=${{ secrets.OCI_FINGERPRINT }}"
+            echo "TF_VAR_region=${{ secrets.OCI_REGION }}"
+            echo "TF_VAR_compartment_ocid=${{ secrets.OCI_COMPARTMENT_OCID }}"
+            echo "TF_VAR_private_key_path=./oci_api_key.pem"
+            echo "TF_VAR_ssh_public_key=${{ secrets.SSH_PUBLIC_KEY }}"
+          } >> $GITHUB_ENV
 
       - name: Terraform Init
         run: |

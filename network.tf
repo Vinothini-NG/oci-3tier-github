@@ -391,7 +391,7 @@ resource "null_resource" "bastion_to_private_test" {
   connection {
     type        = "ssh"
     user        = "opc"
-    private_key = var.ssh_private_key
+    private_key = file("./id_rsa")
     host        = oci_core_instance.bastion_host.public_ip
   }
 
