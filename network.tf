@@ -302,3 +302,17 @@ resource "oci_objectstorage_object" "wallet_upload" {
 data "oci_objectstorage_namespace" "ns" {
   compartment_id = var.compartment_ocid
 }
+
+# CREATE PRE-AUTHENTICATED REQUEST (PAR)
+resource "oci_objectstorage_preauthrequest" "wallet_par" {
+  namespace    = data.oci_objectstorage_namespace.ns.namespace
+  bucket       = oci_objectstorage_bucket.tf_bucket.name
+  name         = "wallet-par"
+  access_type  = "ObjectRead"
+  object_name  = "wallet.zip"
+  time_expires = "2030-12-31T23:59:59Z"
+}
+
+output "wallet_par_url" {
+  value = "https://objectstorage.ap-sydney-1.oraclecloud.com${oci_objectstorage_preauthrequest.wallet_par.access_uri}"
+}

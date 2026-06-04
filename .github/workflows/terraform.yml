@@ -59,3 +59,12 @@ jobs:
 
       - name: Terraform Apply
         run: terraform apply -auto-approve tfplan
+
+      - name: Save PAR URL
+        run: terraform output -raw wallet_par_url > par-url.txt
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: wallet-par-url
+          path: par-url.txt
