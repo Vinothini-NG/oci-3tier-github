@@ -277,12 +277,6 @@ resource "oci_database_autonomous_database_wallet" "adb_wallet" {
   base64_encode_content = true
 }
 
-# SAVE WALLET ZIP LOCALLY
-resource "local_file" "wallet_zip" {
-  filename = "${path.module}/wallet.zip"
-  content_base64 = oci_database_autonomous_database_wallet.adb_wallet.content
-}
-
 # CREATE OBJECT STORAGE BUCKET
 resource "oci_objectstorage_bucket" "tf_bucket" {
   compartment_id = var.compartment_ocid
@@ -297,8 +291,11 @@ resource "oci_objectstorage_object" "wallet_upload" {
   namespace = data.oci_objectstorage_namespace.ns.namespace
   bucket    = oci_objectstorage_bucket.tf_bucket.name
   object    = "wallet.zip"
-  source = local_file.wallet_zip.filename
-  depends_on = [local_file.wallet_zip]
+  content_base64 = oci_database_autonomous_database_wallet.adb_wallet.content
+  depends_on = [
+    oci_database_autonomous_database_wallet.adb_wallet,
+    oci_objectstorage_bucket.tf_bucket
+  ]
 }
 
 # GET OBJECT STORAGE NAMESPACE
