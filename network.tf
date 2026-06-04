@@ -130,3 +130,10 @@ resource "oci_core_instance" "bastion_host" {
     ssh_authorized_keys = var.ssh_public_key
     }
 }
+
+#CREATING NAT GATEWAY
+resource "oci_core_nat_gateway" "private_nat_gateway" {
+  compartment_id = var.compartment_ocid
+  vcn_id         = oci_core_vcn.main_vcn.id
+  display_name   = "private-nat-gateway-tf-github"
+}
