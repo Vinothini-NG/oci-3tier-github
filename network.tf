@@ -316,3 +316,20 @@ resource "oci_objectstorage_preauthrequest" "wallet_par" {
 output "wallet_par_url" {
   value = "https://objectstorage.ap-sydney-1.oraclecloud.com${oci_objectstorage_preauthrequest.wallet_par.access_uri}"
 }
+
+# CREATE LOAD BALANCER
+resource "oci_load_balancer_load_balancer" "load_balancer_tf" {
+  compartment_id = var.compartment_ocid
+  display_name   = "load-balancer-tf-github"
+  shape          = "flexible"
+  is_private     = false
+
+  shape_details {
+    minimum_bandwidth_in_mbps = 10
+    maximum_bandwidth_in_mbps = 10
+  }
+
+  subnet_ids = [
+    oci_core_subnet.public_subnet.id
+  ]
+}
