@@ -1,87 +1,111 @@
 name: OCI Terraform Pipeline
 
 on:
-  push:
-    branches:
-      - main
+push:
+branches:
+- main
 
 jobs:
-  terraform:
-    runs-on: ubuntu-latest
+terraform:
+runs-on: ubuntu-latest
 
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4  # v5 doesn't exist yet
 
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: "~1.9"  # Ensures skip_s3_checksum is available (requires >=1.6.4)
+steps:
+  - name: Checkout Code
+    uses: actions/checkout@v4
 
-      - name: Create OCI API Key
-        run: |
-          cat <<EOF > oci_api_key.pem
-          ${{ secrets.OCI_API_PRIVATE_KEY }}
-          EOF
-          chmod 600 oci_api_key.pem
+  - name: Setup Terraform
+    uses: hashicorp/setup-terraform@v3
+    with:
+      terraform_version: "1.9.8"
 
-      - name: Set Terraform Variables
-        run: |
-          {
-            echo "TF_VAR_tenancy_ocid<<EOF"
-            echo "${{ secrets.OCI_TENANCY_OCID }}"
-            echo "EOF"
-            echo "TF_VAR_user_ocid<<EOF"
-            echo "${{ secrets.OCI_USER_OCID }}"
-            echo "EOF"
-            echo "TF_VAR_fingerprint<<EOF"
-            echo "${{ secrets.OCI_FINGERPRINT }}"
-            echo "EOF"
-            echo "TF_VAR_region<<EOF"
-            echo "${{ secrets.OCI_REGION }}"
-            echo "EOF"
-            echo "TF_VAR_compartment_ocid<<EOF"
-            echo "${{ secrets.OCI_COMPARTMENT_OCID }}"
-            echo "EOF"
-            echo "TF_VAR_private_key_path=./oci_api_key.pem"
-            echo "TF_VAR_ssh_public_key<<EOF"
-            echo "${{ secrets.SSH_PUBLIC_KEY }}"
-            echo "EOF"
-            echo "TF_VAR_ssh_private_key<<EOF"
-            echo "${{ secrets.SSH_PRIVATE_KEY }}"
-            echo "EOF"
-          } >> $GITHUB_ENV
+  # Create OCI API Private Key File
+  - name: Create OCI API Key
+    run: |
+      cat > oci_api_key.pem << 'EOF'
+      ${{ secrets.OCI_API_PRIVATE_KEY }}
+      EOF
+      chmod 600 oci_api_key.pem
 
-      - name: Terraform Init
-        run: |
-          terraform init \
-            -backend-config="access_key=${{ secrets.OCI_S3_ACCESS_KEY }}" \
-            -backend-config="secret_key=${{ secrets.OCI_S3_SECRET_KEY }}" \
-            -backend-config="bucket=terraform-state" \
-            -backend-config="key=oci-3tier/terraform.tfstate" \
-            -backend-config="region=ap-sydney-1" \
-            -backend-config="endpoints={s3=\"https://sdlvq8nmuuve.compat.objectstorage.ap-sydney-1.oraclecloud.com\"}" \
-            -backend-config="skip_region_validation=true" \
-            -backend-config="skip_credentials_validation=true" \
-            -backend-config="skip_requesting_account_id=true" \
-            -backend-config="skip_metadata_api_check=true" \
-            -backend-config="use_path_style=true" \
-            -backend-config="skip_s3_checksum=true"
+  # Export Terraform Variables
+  - name: Set Terraform Variables
+    run: |
+      {
+        echo "TF_VAR_tenancy_ocid<<EOF"
+        echo "${{ secrets.OCI_TENANCY_OCID }}"
+        echo "EOF"
 
-      - name: Terraform Validate
-        run: terraform validate
+        echo "TF_VAR_user_ocid<<EOF"
+        echo "${{ secrets.OCI_USER_OCID }}"
+        echo "EOF"
 
-      - name: Terraform Plan
-        run: terraform plan -out=tfplan
+        echo "TF_VAR_fingerprint<<EOF"
+        echo "${{ secrets.OCI_FINGERPRINT }}"
+        echo "EOF"
 
-      - name: Terraform Apply
-        run: terraform apply -auto-approve tfplan
+        echo "TF_VAR_region<<EOF"
+        echo "${{ secrets.OCI_REGION }}"
+        echo "EOF"
 
-      - name: Save PAR URL
-        run: terraform output -raw wallet_par_url > par-url.txt
+        echo "TF_VAR_compartment_ocid<<EOF"
+        echo "${{ secrets.OCI_COMPARTMENT_OCID }}"
+        echo "EOF"
 
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: wallet-par-url
-          path: par-url.txt
+        echo "TF_VAR_private_key_path=./oci_api_key.pem"
+
+        echo "TF_VAR_ssh_public_key<<EOF"
+        echo "${{ secrets.SSH_PUBLIC_KEY }}"
+        echo "EOF"
+
+        echo "TF_VAR_ssh_private_key<<EOF"
+        echo "${{ secrets.SSH_PRIVATE_KEY }}"
+        echo "EOF"
+      } >> $GITHUB_ENV
+
+  # Debug (Safe)
+  - name: Verify Variables
+    run: |
+      echo "Region: $TF_VAR_region"
+      echo "Fingerprint: $TF_VAR_fingerprint"
+      echo "Tenancy Length: ${#TF_VAR_tenancy_ocid}"
+      echo "User Length: ${#TF_VAR_user_ocid}"
+
+  # Terraform Init using OCI Object Storage Backend
+  - name: Terraform Init
+    run: |
+      terraform init -reconfigure \
+        -backend-config="access_key=${{ secrets.OCI_S3_ACCESS_KEY }}" \
+        -backend-config="secret_key=${{ secrets.OCI_S3_SECRET_KEY }}" \
+        -backend-config="bucket=terraform-state" \
+        -backend-config="key=oci-3tier/terraform.tfstate" \
+        -backend-config="region=ap-sydney-1" \
+        -backend-config="endpoints={s3=\"https://sdlvq8nmuuve.compat.objectstorage.ap-sydney-1.oraclecloud.com\"}" \
+        -backend-config="skip_region_validation=true" \
+        -backend-config="skip_credentials_validation=true" \
+        -backend-config="skip_requesting_account_id=true" \
+        -backend-config="skip_metadata_api_check=true" \
+        -backend-config="use_path_style=true" \
+        -backend-config="skip_s3_checksum=true"
+
+  - name: Terraform Format Check
+    run: terraform fmt -check
+
+  - name: Terraform Validate
+    run: terraform validate
+
+  - name: Terraform Plan
+    run: terraform plan -out=tfplan
+
+  - name: Terraform Apply
+    run: terraform apply -auto-approve tfplan
+
+  # Save Wallet PAR URL
+  - name: Save PAR URL
+    run: terraform output -raw wallet_par_url > par-url.txt
+
+  # Upload PAR URL as Artifact
+  - name: Upload PAR URL Artifact
+    uses: actions/upload-artifact@v4
+    with:
+      name: wallet-par-url
+      path: par-url.txt
