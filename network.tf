@@ -391,7 +391,7 @@ resource "null_resource" "bastion_to_private_test" {
   connection {
     type        = "ssh"
     user        = "opc"
-    private_key = file("./id_rsa")
+    private_key = var.ssh_private_key
     host        = oci_core_instance.bastion_host.public_ip
   }
 
@@ -399,7 +399,9 @@ resource "null_resource" "bastion_to_private_test" {
     inline = [
       "hostname",
       "ping -c 1 google.com",
-      "mkdir -p ~/.ssh"
+      "mkdir -p ~/.ssh",
+      "cat > ~/.ssh/private_key <<'EOF'\n${var.ssh_private_key}\nEOF",
+      "chmod 600 ~/.ssh/private_key"
     ]
   }
 }
