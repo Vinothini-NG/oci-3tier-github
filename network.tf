@@ -382,9 +382,8 @@ output "load_balancer_public_ip" {
 }
 
 resource "null_resource" "bastion_to_private_test" {
-
-    triggers = {
-    version = "2"
+  triggers = {
+    version = "3"
   }
 
   depends_on = [
@@ -399,14 +398,36 @@ resource "null_resource" "bastion_to_private_test" {
     host        = oci_core_instance.bastion_host.public_ip
   }
 
+  # Provisioner 1: sensitive ops — output will be suppressed, that's expected
   provisioner "remote-exec" {
     inline = [
-      "hostname",
-      "ping -c 1 google.com",
       "mkdir -p ~/.ssh",
       "cat > ~/.ssh/private_key <<'EOF'\n${var.ssh_private_key}\nEOF",
       "chmod 600 ~/.ssh/private_key",
+      # Run SSH and write result + exit code to file
+      "ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'echo CONNECTED && hostname && date' > /tmp/connectivity_result.txt 2>&1; echo $? > /tmp/connectivity_exit_code.txt"
+    ]
+  }
 
-"ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'touch /tmp/appnode_test'"    ]
+  # Provisioner 2: no sensitive vars — output will be fully visible in pipeline
+  provisioner "remote-exec" {
+    inline = [
+      "echo '========================================='",
+      "echo '     BASTION CONNECTIVITY TEST RESULT    '",
+      "echo '========================================='",
+      "echo 'Bastion hostname:'",
+      "hostname",
+      "echo ''",
+      "echo 'Target app node IP: ${oci_core_instance.application_node1.private_ip}'",
+      "echo ''",
+      "echo '--- SSH Result ---'",
+      "cat /tmp/connectivity_result.txt",
+      "echo ''",
+      "echo -n 'SSH Exit Code: '",
+      "cat /tmp/connectivity_exit_code.txt",
+      "echo ''",
+      # Fail the provisioner (and terraform apply) if SSH actually failed
+      "exit $(cat /tmp/connectivity_exit_code.txt)"
+    ]
   }
 }
