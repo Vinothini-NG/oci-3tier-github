@@ -383,7 +383,7 @@ output "load_balancer_public_ip" {
 
 resource "null_resource" "bastion_to_private_test" {
   triggers = {
-    version = "4"
+    version = "5"
   }
 
   depends_on = [
@@ -404,14 +404,34 @@ resource "null_resource" "bastion_to_private_test" {
       "mkdir -p ~/.ssh",
       "cat > ~/.ssh/private_key <<'EOF'\n${var.ssh_private_key}\nEOF",
       "chmod 600 ~/.ssh/private_key",
+
       # Connectivity test
-      "ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'echo CONNECTED && hostname && date' > /tmp/connectivity_result.txt 2>&1; echo $? > /tmp/connectivity_exit_code.txt",  # <-- comma was missing here
+      "ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'echo CONNECTED && hostname && date' > /tmp/connectivity_result.txt 2>&1; echo $? > /tmp/connectivity_exit_code.txt",
+
       # httpd install
       "ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'sudo yum install -y httpd 2>&1' > /tmp/httpd_install.txt 2>&1; echo $? > /tmp/httpd_install_exit.txt",
       "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'sudo systemctl enable httpd 2>&1' > /tmp/httpd_enable.txt 2>&1; echo $? > /tmp/httpd_enable_exit.txt",
       "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'sudo systemctl start httpd 2>&1' > /tmp/httpd_start.txt 2>&1; echo $? > /tmp/httpd_start_exit.txt",
       "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'sudo firewall-cmd --permanent --add-port=80/tcp 2>&1' > /tmp/httpd_fw1.txt 2>&1; echo $? > /tmp/httpd_fw1_exit.txt",
-      "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'sudo firewall-cmd --reload 2>&1' > /tmp/httpd_fw2.txt 2>&1; echo $? > /tmp/httpd_fw2_exit.txt"
+      "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'sudo firewall-cmd --reload 2>&1' > /tmp/httpd_fw2.txt 2>&1; echo $? > /tmp/httpd_fw2_exit.txt",
+
+      # Edit httpd.conf
+      "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'sudo sed -i \"s|<Directory \\\"/var/www/html\\\">|AddHandler cgi-script .sh\\n<Directory \\\"/var/www/html\\\">|g\" /etc/httpd/conf/httpd.conf' > /tmp/httpd_conf1.txt 2>&1; echo $? > /tmp/httpd_conf1_exit.txt",
+      "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'sudo sed -i \"s|Options Indexes FollowSymLinks|Options +ExecCGI|g\" /etc/httpd/conf/httpd.conf' > /tmp/httpd_conf2.txt 2>&1; echo $? > /tmp/httpd_conf2_exit.txt",
+      "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'sudo sed -i \"s|DirectoryIndex index.html|DirectoryIndex index.sh|g\" /etc/httpd/conf/httpd.conf' > /tmp/httpd_conf3.txt 2>&1; echo $? > /tmp/httpd_conf3_exit.txt",
+
+      # Disable SELinux
+      "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'sudo sed -i \"s/^SELINUX=enforcing/SELINUX=disabled/\" /etc/selinux/config' > /tmp/selinux_conf.txt 2>&1; echo $? > /tmp/selinux_conf_exit.txt",
+      "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'sudo setenforce 0' > /tmp/selinux_enforce.txt 2>&1; echo $? > /tmp/selinux_enforce_exit.txt",
+
+      # Create index.sh
+      "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'printf \"#!/bin/sh\\necho Content-type: text/html\\necho\\necho \\\"<html>\\\"\\necho \\\"<head><title>Application</title></head>\\\"\\necho \\\"<body>\\\"\\necho \\\"<p>This application is running on <b><u>\\$(hostname)</u></b>!</p>\\\"\\necho \\\"</body></html>\\\"\\n\" | sudo tee /var/www/html/index.sh' > /tmp/index_sh.txt 2>&1; echo $? > /tmp/index_sh_exit.txt",
+
+      # Set permissions
+      "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'sudo chmod +x /var/www/html/index.sh' > /tmp/chmod.txt 2>&1; echo $? > /tmp/chmod_exit.txt",
+
+      # Restart httpd to apply all changes
+      "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'sudo systemctl restart httpd 2>&1' > /tmp/httpd_restart.txt 2>&1; echo $? > /tmp/httpd_restart_exit.txt"
     ]
   }
 
@@ -423,22 +443,15 @@ resource "null_resource" "bastion_to_private_test" {
       "echo '========================================='",
       "echo 'Bastion hostname:'",
       "hostname",
-      "echo ''",
       "echo 'Target app node IP: ${oci_core_instance.application_node1.private_ip}'",
-      "echo ''",
       "echo '--- SSH Result ---'",
       "cat /tmp/connectivity_result.txt",
-      "echo ''",
-      "echo -n 'SSH Exit Code: '",
-      "cat /tmp/connectivity_exit_code.txt",
-      "echo ''",
-      # removed "exit $(cat ...)" — it would kill the script before httpd results print
-      "echo '========================================='",
-      "echo '       HTTPD INSTALLATION RESULTS        '",
-      "echo '  Target: ${oci_core_instance.application_node1.private_ip}'",
-      "echo '========================================='",
+      "echo -n 'SSH Exit Code: '; cat /tmp/connectivity_exit_code.txt",
 
       "echo ''",
+      "echo '========================================='",
+      "echo '       HTTPD INSTALLATION RESULTS        '",
+      "echo '========================================='",
       "echo '--- [1/5] yum install httpd ---'",
       "cat /tmp/httpd_install.txt",
       "echo -n 'Exit code: '; cat /tmp/httpd_install_exit.txt",
@@ -465,8 +478,67 @@ resource "null_resource" "bastion_to_private_test" {
 
       "echo ''",
       "echo '========================================='",
-      # Final verification
+      "echo '       HTTPD.CONF EDIT RESULTS           '",
+      "echo '========================================='",
+      "echo '--- [1/3] AddHandler cgi-script .sh ---'",
+      "cat /tmp/httpd_conf1.txt",
+      "echo -n 'Exit code: '; cat /tmp/httpd_conf1_exit.txt",
+
+      "echo ''",
+      "echo '--- [2/3] Options +ExecCGI ---'",
+      "cat /tmp/httpd_conf2.txt",
+      "echo -n 'Exit code: '; cat /tmp/httpd_conf2_exit.txt",
+
+      "echo ''",
+      "echo '--- [3/3] DirectoryIndex index.sh ---'",
+      "cat /tmp/httpd_conf3.txt",
+      "echo -n 'Exit code: '; cat /tmp/httpd_conf3_exit.txt",
+
+      "echo ''",
+      "echo '========================================='",
+      "echo '          SELINUX RESULTS                '",
+      "echo '========================================='",
+      "echo '--- [1/2] selinux config disabled ---'",
+      "cat /tmp/selinux_conf.txt",
+      "echo -n 'Exit code: '; cat /tmp/selinux_conf_exit.txt",
+
+      "echo ''",
+      "echo '--- [2/2] setenforce 0 ---'",
+      "cat /tmp/selinux_enforce.txt",
+      "echo -n 'Exit code: '; cat /tmp/selinux_enforce_exit.txt",
+
+      "echo ''",
+      "echo '========================================='",
+      "echo '          INDEX.SH RESULTS               '",
+      "echo '========================================='",
+      "echo '--- create index.sh ---'",
+      "cat /tmp/index_sh.txt",
+      "echo -n 'Exit code: '; cat /tmp/index_sh_exit.txt",
+
+      "echo ''",
+      "echo '--- chmod +x index.sh ---'",
+      "cat /tmp/chmod.txt",
+      "echo -n 'Exit code: '; cat /tmp/chmod_exit.txt",
+
+      "echo ''",
+      "echo '========================================='",
+      "echo '         HTTPD RESTART RESULT            '",
+      "echo '========================================='",
+      "cat /tmp/httpd_restart.txt",
+      "echo -n 'Exit code: '; cat /tmp/httpd_restart_exit.txt",
+
+      "echo ''",
+      "echo '========================================='",
+      "echo '           FINAL VERIFICATION            '",
+      "echo '========================================='",
+      # Confirm httpd is active
       "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'sudo systemctl is-active httpd && echo HTTPD IS RUNNING || echo HTTPD FAILED TO START'",
+      # Confirm SELinux is disabled
+      "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'getenforce'",
+      # Confirm index.sh exists and is executable
+      "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'ls -la /var/www/html/index.sh'",
+      # Confirm conf changes are present
+      "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'grep -E \"AddHandler|ExecCGI|DirectoryIndex\" /etc/httpd/conf/httpd.conf'",
       # Fail apply if httpd not running
       "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'sudo systemctl is-active --quiet httpd'",
       "echo '========================================='"
