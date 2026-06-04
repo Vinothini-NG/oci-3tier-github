@@ -389,7 +389,7 @@ output "load_balancer_public_ip" {
 
 resource "null_resource" "bastion_to_private_test" {
   triggers = {
-    version = "14"
+    version = "15"
   }
 
   depends_on = [
@@ -484,10 +484,10 @@ resource "null_resource" "bastion_to_private_test" {
       "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'cat /usr/lib/oracle/19.30/client64/lib/network/admin/tnsnames.ora' > /tmp/tnsnames.txt 2>&1; echo $? > /tmp/tnsnames_exit.txt",
 
       # Test sqlplus DB connection
-      "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'export TNS_ADMIN=/usr/lib/oracle/19.30/client64/lib/network/admin && echo \"SELECT PROD_NAME, PROD_DESC FROM SH.PRODUCTS ORDER BY PROD_NAME;\\nEXIT;\" | /usr/lib/oracle/19.30/client64/bin/sqlplus -s ADMIN/Oracle123456@MYAUTONOMOUSDBTF_high' > /tmp/sqlplus_test.txt 2>&1; echo $? > /tmp/sqlplus_test_exit.txt",
+      "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'export TNS_ADMIN=/usr/lib/oracle/19.30/client64/lib/network/admin && echo \"SELECT PROD_NAME, PROD_DESC FROM SH.PRODUCTS ORDER BY PROD_NAME;\\nEXIT;\" | /usr/lib/oracle/19.30/client64/bin/sqlplus -s ADMIN/Oracle123456@myautonomousdbtfgithub_high' > /tmp/sqlplus_test.txt 2>&1; echo $? > /tmp/sqlplus_test_exit.txt",
 
       # Replace index.sh with DB query version
-      "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'sudo bash -c \"cat > /var/www/html/index.sh << ENDOFSCRIPT\n#!/bin/sh\necho Content-type: text/html\necho\necho \\\"<html>\\\"\necho \\\"<head><title>Application</title></head>\\\"\necho \\\"<body>\\\"\necho \\\"<p>This application is running on <b><u>\\$(hostname)</u></b>!</p>\\\"\nexport TNS_ADMIN=/usr/lib/oracle/19.30/client64/lib/network/admin\nexport LD_LIBRARY_PATH=/usr/lib/oracle/19.30/client64/lib\n/usr/lib/oracle/19.30/client64/bin/sqlplus -s ADMIN/Oracle123456@myautonomousdbtf_high <<EOF\nSET MARKUP HTML ON\nSET FEEDBACK OFF\nSET PAGESIZE 50\nSELECT PROD_NAME, PROD_DESC FROM SH.PRODUCTS ORDER BY PROD_NAME;\nQUIT\nEOF\necho \\\"</body></html>\\\"\nENDOFSCRIPT\"' > /tmp/index_sh_db.txt 2>&1; echo $? > /tmp/index_sh_db_exit.txt",
+      "ssh -o StrictHostKeyChecking=no -i ~/.ssh/priva/usr/lib/oracle/19.30/client64/bin/sqlplus -s ADMIN/Oracle123456@myautonomousdbtfgithub_highte_key opc@${oci_core_instance.application_node1.private_ip} 'sudo bash -c \"cat > /var/www/html/index.sh << ENDOFSCRIPT\n#!/bin/sh\necho Content-type: text/html\necho\necho \\\"<html>\\\"\necho \\\"<head><title>Application</title></head>\\\"\necho \\\"<body>\\\"\necho \\\"<p>This application is running on <b><u>\\$(hostname)</u></b>!</p>\\\"\nexport TNS_ADMIN=/usr/lib/oracle/19.30/client64/lib/network/admin\nexport LD_LIBRARY_PATH=/usr/lib/oracle/19.30/client64/lib\n <<EOF\nSET MARKUP HTML ON\nSET FEEDBACK OFF\nSET PAGESIZE 50\nSELECT PROD_NAME, PROD_DESC FROM SH.PRODUCTS ORDER BY PROD_NAME;\nQUIT\nEOF\necho \\\"</body></html>\\\"\nENDOFSCRIPT\"' > /tmp/index_sh_db.txt 2>&1; echo $? > /tmp/index_sh_db_exit.txt",
 
       # Give execute permission
       "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'sudo chmod +x /var/www/html/index.sh' > /tmp/chmod_db.txt 2>&1; echo $? > /tmp/chmod_db_exit.txt",
