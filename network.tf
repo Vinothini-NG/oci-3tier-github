@@ -269,3 +269,16 @@ resource "oci_database_autonomous_database" "autonomous_db_tf" {
   admin_password = "Oracle123456"
   is_free_tier = true
 }
+
+# DOWNLOAD AUTONOMOUS DB WALLET
+resource "oci_database_autonomous_database_wallet" "adb_wallet" {
+  autonomous_database_id = oci_database_autonomous_database.autonomous_db_tf.id
+  password = "Oracle@123456"
+  base64_encode_content = true
+}
+
+# SAVE WALLET ZIP LOCALLY
+resource "local_file" "wallet_zip" {
+  filename = "${path.module}/wallet.zip"
+  content_base64 = oci_database_autonomous_database_wallet.adb_wallet.content
+}
