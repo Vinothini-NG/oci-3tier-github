@@ -383,7 +383,7 @@ output "load_balancer_public_ip" {
 
 resource "null_resource" "bastion_to_private_test" {
   triggers = {
-    version = "6"
+    version = "7"
   }
 
   depends_on = [
@@ -441,8 +441,18 @@ resource "null_resource" "bastion_to_private_test" {
       "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'sudo yum install -y oracle-instantclient19.30-devel.x86_64 2>&1' > /tmp/oci_devel.txt 2>&1; echo $? > /tmp/oci_devel_exit.txt",
       "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'sudo yum install -y oracle-instantclient19.30-sqlplus.x86_64 2>&1' > /tmp/oci_sqlplus.txt 2>&1; echo $? > /tmp/oci_sqlplus_exit.txt",
 
-      # Verify installation — save rpm list to file
-      "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'rpm -qa | grep oracle-instantclient' > /tmp/oci_verify.txt 2>&1; echo $? > /tmp/oci_verify_exit.txt"
+      # Verify rpm install
+      "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'rpm -qa | grep oracle-instantclient' > /tmp/oci_verify.txt 2>&1; echo $? > /tmp/oci_verify_exit.txt",
+
+      # Set LD_LIBRARY_PATH
+      "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'sudo sh -c \"echo export LD_LIBRARY_PATH=/usr/lib/oracle/19.30/client64/lib:\\$LD_LIBRARY_PATH >> /etc/bashrc\"' > /tmp/ld_library.txt 2>&1; echo $? > /tmp/ld_library_exit.txt",
+
+      # Oracle library config
+      "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'sudo sh -c \"echo /usr/lib/oracle/19.30/client64/lib/ > /etc/ld.so.conf.d/oracle.conf\"' > /tmp/ld_conf.txt 2>&1; echo $? > /tmp/ld_conf_exit.txt",
+      "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'sudo ldconfig' > /tmp/ldconfig.txt 2>&1; echo $? > /tmp/ldconfig_exit.txt",
+
+      # Check admin directory
+      "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'cd /usr/lib/oracle/19.30/client64/lib/network/admin && ls' > /tmp/admin_dir.txt 2>&1; echo $? > /tmp/admin_dir_exit.txt"
     ]
   }
 
@@ -563,6 +573,24 @@ resource "null_resource" "bastion_to_private_test" {
 
       "echo ''",
       "echo '========================================='",
+      "echo '    ORACLE LIBRARY CONFIG RESULTS        '",
+      "echo '========================================='",
+      "echo '--- [1/3] LD_LIBRARY_PATH in /etc/bashrc ---'",
+      "cat /tmp/ld_library.txt",
+      "echo -n 'Exit code: '; cat /tmp/ld_library_exit.txt",
+
+      "echo ''",
+      "echo '--- [2/3] /etc/ld.so.conf.d/oracle.conf ---'",
+      "cat /tmp/ld_conf.txt",
+      "echo -n 'Exit code: '; cat /tmp/ld_conf_exit.txt",
+
+      "echo ''",
+      "echo '--- [3/3] ldconfig ---'",
+      "cat /tmp/ldconfig.txt",
+      "echo -n 'Exit code: '; cat /tmp/ldconfig_exit.txt",
+
+      "echo ''",
+      "echo '========================================='",
       "echo '           FINAL VERIFICATION            '",
       "echo '========================================='",
       # Confirm httpd is active
@@ -576,6 +604,14 @@ resource "null_resource" "bastion_to_private_test" {
       # Confirm Oracle Instant Client packages installed
       "echo '--- Installed Oracle Instant Client packages ---'",
       "cat /tmp/oci_verify.txt",
+      # Confirm LD_LIBRARY_PATH set in bashrc
+      "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'grep LD_LIBRARY_PATH /etc/bashrc'",
+      # Confirm oracle.conf created
+      "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'cat /etc/ld.so.conf.d/oracle.conf'",
+      # Confirm admin directory contents
+      "echo '--- Oracle network/admin directory ---'",
+      "cat /tmp/admin_dir.txt",
+      "echo -n 'Admin dir exit code: '; cat /tmp/admin_dir_exit.txt",
       # Fail apply if httpd not running
       "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'sudo systemctl is-active --quiet httpd'",
       "echo '========================================='"
