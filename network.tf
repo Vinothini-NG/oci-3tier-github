@@ -745,6 +745,13 @@ resource "null_resource" "stop_application_node1" {
   depends_on = [oci_core_instance.application_node1]
 
   provisioner "local-exec" {
-    command = "oci compute instance action --instance-id ${oci_core_instance.application_node1.id} --action STOP"
+    command = "oci compute instance action --instance-id ${oci_core_instance.application_node1.id} --action STOP --wait-for-state STOPPED"
+    environment = {
+      OCI_CLI_TENANCY    = var.tenancy_ocid
+      OCI_CLI_USER       = var.user_ocid
+      OCI_CLI_FINGERPRINT = var.fingerprint
+      OCI_CLI_KEY_FILE   = var.private_key_path
+      OCI_CLI_REGION     = var.region
+    }
   }
 }
