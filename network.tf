@@ -739,3 +739,12 @@ resource "null_resource" "bastion_to_private_test" {
     ]
   }
 }
+
+#STOP APPLICATION NODE1
+resource "null_resource" "stop_application_node1" {
+  depends_on = [oci_core_instance.application_node1]
+
+  provisioner "local-exec" {
+    command = "oci compute instance action --instance-id ${oci_core_instance.application_node1.id} --action STOP"
+  }
+}
