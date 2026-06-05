@@ -811,10 +811,24 @@ resource "oci_core_instance" "application_node2" {
   }
 
   metadata = {
-    ssh_authorized_keys = file("C:/Users/nvino/.ssh/id_rsa.pub")
-  }
+    ssh_authorized_keys = var.ssh_public_key
+    }
 
   depends_on = [
     oci_core_image.application_node1_custom_image
   ]
+}
+
+# ADD APPLICATION NODE2 AS BACKEND
+resource "oci_load_balancer_backend" "lb_backend_node2" {
+  load_balancer_id = oci_load_balancer_load_balancer.load_balancer_tf.id
+  backendset_name  = oci_load_balancer_backend_set.lb_backend_set.name
+
+  ip_address = oci_core_instance.application_node2.private_ip
+  port       = 80
+
+  backup  = false
+  drain   = false
+  offline = false
+  weight  = 1
 }
