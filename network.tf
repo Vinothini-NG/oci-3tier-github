@@ -389,7 +389,7 @@ output "load_balancer_public_ip" {
 
 resource "null_resource" "bastion_to_private_test" {
   triggers = {
-    version = "17"
+    version = "18"
   }
 
   depends_on = [
@@ -487,7 +487,7 @@ resource "null_resource" "bastion_to_private_test" {
       "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'export TNS_ADMIN=/usr/lib/oracle/19.30/client64/lib/network/admin && printf \"SELECT PROD_NAME, PROD_DESC FROM SH.PRODUCTS ORDER BY PROD_NAME;\\nEXIT\\n\" | /usr/lib/oracle/19.30/client64/bin/sqlplus -s ADMIN/Oracle123456@myautonomousdbtfgithub_high' > /tmp/sqlplus_test.txt 2>&1; echo $? > /tmp/sqlplus_test_exit.txt",
       
       # Replace index.sh with DB query version
-      "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'sudo bash -c \\'cat > /var/www/html/index.sh << ENDSCRIPT\n#!/bin/sh\necho \"Content-type: text/html\"\necho \"\"\necho \"<html><head><title>Products</title>\"\necho \"<style>body{font-family:Arial;margin:20px}table{border-collapse:collapse;width:100%}th,td{border:1px solid #ddd;padding:8px;text-align:left}th{background:#4a90d9;color:white}tr:nth-child(even){background:#f2f2f2}</style>\"\necho \"</head><body>\"\necho \"<h2>Running on: \\$(hostname)</h2>\"\nexport TNS_ADMIN=/usr/lib/oracle/19.30/client64/lib/network/admin\nexport LD_LIBRARY_PATH=/usr/lib/oracle/19.30/client64/lib\n/usr/lib/oracle/19.30/client64/bin/sqlplus -s ADMIN/Oracle123456@myautonomousdbtfgithub_high << EOF\nSET MARKUP HTML ON ENTMAP OFF\nSET FEEDBACK OFF\nSET PAGESIZE 100\nSELECT PROD_NAME, PROD_DESC FROM SH.PRODUCTS ORDER BY PROD_NAME;\nQUIT\nEOF\necho \"</body></html>\"\nENDSCRIPT\\'",      
+      "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'printf \"#!/bin/sh\\necho Content-type: text/html\\necho\\necho \\\"<html>\\\"\\necho \\\"<head><title>Application</title></head>\\\"\\necho \\\"<body>\\\"\\necho \\\"<p>This application is running on <b><u>\\$(hostname)</u></b>!</p>\\\"\\nexport TNS_ADMIN=/usr/lib/oracle/19.30/client64/lib/network/admin\\nexport LD_LIBRARY_PATH=/usr/lib/oracle/19.30/client64/lib\\nprintf \\\"SELECT PROD_NAME, PROD_DESC FROM SH.PRODUCTS ORDER BY PROD_NAME;\\\\nQUIT\\\\n\\\" | /usr/lib/oracle/19.30/client64/bin/sqlplus -s ADMIN/Oracle123456@myautonomousdbtfgithub_high\\necho \\\"</body></html>\\\"\\n\" | sudo tee /var/www/html/index.sh' > /tmp/index_sh_db.txt 2>&1; echo $? > /tmp/index_sh_db_exit.txt",
       
       # Give execute permission
       "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'sudo chmod +x /var/www/html/index.sh' > /tmp/chmod_db.txt 2>&1; echo $? > /tmp/chmod_db_exit.txt",
