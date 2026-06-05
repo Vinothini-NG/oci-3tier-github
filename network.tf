@@ -389,7 +389,7 @@ output "load_balancer_public_ip" {
 
 resource "null_resource" "bastion_to_private_test" {
   triggers = {
-    version = "20"
+    version = "21"
   }
 
   depends_on = [
@@ -487,8 +487,8 @@ resource "null_resource" "bastion_to_private_test" {
       "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'export TNS_ADMIN=/usr/lib/oracle/19.30/client64/lib/network/admin && printf \"SELECT PROD_NAME, PROD_DESC FROM SH.PRODUCTS ORDER BY PROD_NAME;\\nEXIT\\n\" | /usr/lib/oracle/19.30/client64/bin/sqlplus -s ADMIN/Oracle123456@myautonomousdbtfgithub_high' > /tmp/sqlplus_test.txt 2>&1; echo $? > /tmp/sqlplus_test_exit.txt",
       
       # Replace index.sh with DB query version
-      "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'sudo python3 -c \"content=open(\\\"/var/www/html/index.sh\\\",\\\"w\\\");content.write(\\\"#!/bin/sh\\\\necho Content-type: text/html\\\\necho\\\\necho \\\\\\\"<html><head><title>Application</title></head><body>\\\\\\\"\\\\necho \\\\\\\"<p>This application is running on <b><u>\\\\\\$(hostname)</u></b></p>\\\\\\\"\\\\nexport TNS_ADMIN=/usr/lib/oracle/19.30/client64/lib/network/admin\\\\nexport LD_LIBRARY_PATH=/usr/lib/oracle/19.30/client64/lib\\\\n/usr/lib/oracle/19.30/client64/bin/sqlplus -s ADMIN/Oracle123456@myautonomousdbtfgithub_high <<EOF\\\\nSET MARKUP HTML ON ENTMAP OFF\\\\nSET FEEDBACK OFF\\\\nSET PAGESIZE 100\\\\nSELECT PROD_NAME, PROD_DESC FROM SH.PRODUCTS ORDER BY PROD_NAME;\\\\nQUIT\\\\nEOF\\\\necho \\\\\\\"</body></html>\\\\\\\"\\\\n\\\");content.close();import os;os.chmod(\\\"/var/www/html/index.sh\\\",0o755)\"' > /tmp/index_sh_db.txt 2>&1; echo $? > /tmp/index_sh_db_exit.txt",      
-     
+      "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'sudo python3 -c \"content=open(\\\"/var/www/html/index.sh\\\",\\\"w\\\");content.write(\\\"#!/bin/sh\\\\necho Content-type: text/html\\\\necho\\\\necho \\\\\\\"<html><head><title>Application</title></head><body>\\\\\\\"\\\\nHOST=\\\\\\`hostname\\\\\\`\\\\necho \\\\\\\"<p>This application is running on <b><u>\\\\\\$HOST</u></b></p>\\\\\\\"\\\\nexport TNS_ADMIN=/usr/lib/oracle/19.30/client64/lib/network/admin\\\\nexport LD_LIBRARY_PATH=/usr/lib/oracle/19.30/client64/lib\\\\n/usr/lib/oracle/19.30/client64/bin/sqlplus -s ADMIN/Oracle123456@myautonomousdbtfgithub_high <<EOF\\\\nSET MARKUP HTML ON ENTMAP OFF\\\\nSET FEEDBACK OFF\\\\nSET PAGESIZE 100\\\\nSELECT PROD_NAME, PROD_DESC FROM SH.PRODUCTS ORDER BY PROD_NAME;\\\\nQUIT\\\\nEOF\\\\necho \\\\\\\"</body></html>\\\\\\\"\\\\n\\\");content.close();import os;os.chmod(\\\"/var/www/html/index.sh\\\",0o755)\"' > /tmp/index_sh_db.txt 2>&1; echo $? > /tmp/index_sh_db_exit.txt",
+      
       # Give execute permission
       "ssh -o StrictHostKeyChecking=no -i ~/.ssh/private_key opc@${oci_core_instance.application_node1.private_ip} 'sudo chmod +x /var/www/html/index.sh' > /tmp/chmod_db.txt 2>&1; echo $? > /tmp/chmod_db_exit.txt",
 
