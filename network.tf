@@ -784,3 +784,37 @@ resource "null_resource" "start_application_node1" {
     }
   }
 }
+
+#CREATING APPLICATION NODE2 TF
+resource "oci_core_instance" "application_node2" {
+
+  compartment_id = var.compartment_ocid
+  availability_domain = "eaWm:AP-SYDNEY-1-AD-1"
+  display_name = "application-node2-tf-github"
+  shape = "VM.Standard.E5.Flex"
+  shape_config {
+    ocpus         = 1
+    memory_in_gbs = 12
+  }
+
+  create_vnic_details {
+    subnet_id        = oci_core_subnet.private_subnet.id
+    assign_public_ip = false
+    display_name     = "app-node2-vnic"
+    hostname_label   = "appnode2"
+  }
+
+  source_details {
+    source_type = "image"
+
+    source_id = oci_core_image.application_node1_custom_image.id
+  }
+
+  metadata = {
+    ssh_authorized_keys = file("C:/Users/nvino/.ssh/id_rsa.pub")
+  }
+
+  depends_on = [
+    oci_core_image.application_node1_custom_image
+  ]
+}
