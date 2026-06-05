@@ -18,6 +18,13 @@ jobs:
         with:
           terraform_version: "~1.9"  # Ensures skip_s3_checksum is available (requires >=1.6.4)
 
+      - name: Install OCI CLI
+        run: |
+          curl -L -O https://raw.githubusercontent.com/oracle/oci-cli/master/scripts/install/install.sh
+          chmod +x install.sh
+          ./install.sh --accept-all-defaults
+          echo "/home/runner/bin" >> $GITHUB_PATH
+
       - name: Create OCI API Key
         run: |
           cat <<EOF > oci_api_key.pem
