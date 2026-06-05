@@ -768,3 +768,19 @@ resource "oci_core_image" "application_node1_custom_image" {
     create = "60m"
   }
 }
+
+#START THE STOPPED APPLICATION NODE1
+resource "null_resource" "start_application_node1" {
+  depends_on = [oci_core_image.application_node1_custom_image]
+
+  provisioner "local-exec" {
+    command = "oci compute instance action --instance-id ${oci_core_instance.application_node1.id} --action START --wait-for-state RUNNING"
+    environment = {
+      OCI_CLI_TENANCY     = var.tenancy_ocid
+      OCI_CLI_USER        = var.user_ocid
+      OCI_CLI_FINGERPRINT = var.fingerprint
+      OCI_CLI_KEY_FILE    = var.private_key_path
+      OCI_CLI_REGION      = var.region
+    }
+  }
+}
