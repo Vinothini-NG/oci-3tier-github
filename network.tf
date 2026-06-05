@@ -755,3 +755,16 @@ resource "null_resource" "stop_application_node1" {
     }
   }
 }
+
+#CREATE CUSTOM IMAGE FOR APPLICATION NODE1
+resource "oci_core_image" "application_node1_custom_image" {
+  compartment_id = var.compartment_ocid
+  instance_id    = oci_core_instance.application_node1.id
+  display_name   = "application-node1-custom-image-tf-github"
+
+  launch_mode = "NATIVE"
+
+  timeouts {
+    create = "60m"
+  }
+}
